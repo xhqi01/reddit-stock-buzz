@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reddit Buzz Tracker</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;1,300&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
+:root {
+  --bg: #f7f6f3;
+  --white: #ffffff;
+  --border: #e0ddd8;
+  --border2: #ccc9c2;
+  --text: #1a1a1a;
+  --muted: #888880;
+  --muted2: #bbb8b0;
+  --accent: #1a1a1a;
+  --green: #1a7a4a;
+  --red: #c0392b;
+  --tag-bg: #eeece8;
+  --selected: #1a1a1a;
+  --selected-text: #f7f6f3;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'IBM Plex Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* ── HEADER ── */
+header {
+  padding: 2.5rem 3rem 2rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.logo { display: flex; flex-direction: column; gap: 0.25rem; }
+
+.logo-title {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 1.2rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.logo-sub {
+  font-size: 0.7rem;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+/* ── LAYOUT ── */
+.layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  min-height: calc(100vh - 80px);
+}
+
+/* ── SIDEBAR ── */
+.sidebar {
+  border-right: 1px solid var(--border);
+  padding: 2rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.section-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.62rem;
+  color: var(--muted);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-bottom: 0.75rem;
+}
+
+/* subreddit pills */
+.subreddit-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.pill {
+  padding: 0.4rem 0.85rem;
+  border: 1px solid var(--border2);
+  background: var(--white);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: all 0.12s;
+  user-select: none;
+  color: var(--muted);
+}
+
+.pill:hover {
+  border-color: var(--text);
+  color: var(--text);
+}
+
+.pill.selected {
+  background: var(--selected);
+  border-color: var(--selected);
+  color: var(--selected-text);
+}
+
+/* fields */
+.field { display: flex; flex-direction: column; gap: 0.4rem; }
+
+input[type="text"],
+input[type="password"],
+input[type="email"],
+input[type="number"] {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.82rem;
+  padding: 0.6rem 0;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border2);
+  outline: none;
+  color: var(--text);
+  transition: border-color 0.15s;
+  width: 100%;
+}
+
+input:focus { border-bottom-color: var(--text); }
+input::placeholder { color: var(--muted2); }
+
+/* toggle */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+}
+
+.toggle-label {
+  font-size: 0.78rem;
+  color: var(--text);
+}
+
+.toggle {
+  position: relative;
+  width: 36px;
+  height: 20px;
+}
+
+.toggle input { display: none; }
+
+.toggle-track {
+  position: absolute;
+  inset: 0;
+  background: var(--border2);
+  border-radius: 20px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.toggle input:checked + .toggle-track { background: var(--text); }
+
+.toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.2s;
+  pointer-events: none;
+}
+
+.toggle input:checked ~ .toggle-thumb { transform: translateX(16px); }
+
+.email-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height 0.3s ease, opacity 0.3s;
+  opacity: 0;
+}
+
+.email-fields.open {
+  max-height: 300px;
+  opacity: 1;
+}
+
+/* run button */
+.btn-run {
+  width: 100%;
+  padding: 0.8rem;
+  background: var(--text);
+  color: var(--bg);
+  border: none;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  margin-top: auto;
+}
+
+.btn-run:hover { opacity: 0.8; }
+.btn-run:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ── MAIN CONTENT ── */
+.content {
+  padding: 2rem 2.5rem;
+  display: flex;
+  flex-direction: column;
+}
+
+/* empty state */
+.empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  color: var(--muted2);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+}
+
+.empty-state svg { opacity: 0.2; }
+
+/* status */
+.scan-status {
+  display: none;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.2rem;
+  background: var(--white);
+  border: 1px solid var(--border);
+  margin-bottom: 1.5rem;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.scan-status.visible { display: flex; }
+.scan-status.error { color: var(--red); border-color: #f5c6c6; }
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--border2);
+  border-top-color: var(--text);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* results header */
+.results-header {
+  display: none;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 1.2rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.results-header.visible { display: flex; }
+
+.results-title {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.results-meta {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--muted);
+}
+
+/* ticker cards */
+.ticker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.ticker-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  padding: 1.2rem;
+  animation: cardIn 0.3s ease both;
+}
+
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.8rem;
+}
+
+.card-ticker {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.card-mentions {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--muted);
+  background: var(--tag-bg);
+  padding: 0.2rem 0.6rem;
+}
+
+.card-price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+}
+
+.card-price {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.card-change {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.75rem;
+}
+
+.card-change.up { color: var(--green); }
+.card-change.down { color: var(--red); }
+
+.card-posts { border-top: 1px solid var(--border); padding-top: 0.7rem; }
+
+.post-item {
+  padding: 0.35rem 0;
+  font-size: 0.7rem;
+  color: var(--muted);
+  line-height: 1.4;
+  border-bottom: 1px solid var(--bg);
+}
+
+.post-item a {
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.1s;
+}
+
+.post-item a:hover { color: var(--text); }
+
+.post-sub {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.6rem;
+  color: var(--muted2);
+  margin-right: 0.4rem;
+}
+
+/* mention bar */
+.mention-bar-wrap {
+  margin-bottom: 0.8rem;
+}
+
+.mention-bar {
+  height: 2px;
+  background: var(--border);
+  border-radius: 1px;
+  overflow: hidden;
+}
+
+.mention-bar-fill {
+  height: 100%;
+  background: var(--text);
+  border-radius: 1px;
+  transition: width 0.6s ease;
+}
+
+@media (max-width: 768px) {
+  header { padding: 1.5rem; flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+  .layout { grid-template-columns: 1fr; }
+  .sidebar { border-right: none; border-bottom: 1px solid var(--border); }
+  .content { padding: 1.5rem; }
+  .ticker-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-title">reddit buzz tracker</div>
+    <div class="logo-sub">what is retail talking about · right now</div>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+
+    <div>
+      <div class="section-label">Subreddits</div>
+      <div class="subreddit-grid" id="subreddit-pills">
+        <!-- pills injected by JS -->
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Reddit API</div>
+      <div class="field" style="margin-bottom:0.8rem">
+        <input type="text" id="reddit-id" placeholder="client_id">
+      </div>
+      <div class="field">
+        <input type="password" id="reddit-secret" placeholder="client_secret">
+      </div>
+      <div style="font-size:0.62rem;color:var(--muted);margin-top:0.5rem;font-family:'IBM Plex Mono',monospace">
+        <a href="https://www.reddit.com/prefs/apps" target="_blank" style="color:var(--muted)">reddit.com/prefs/apps</a> → create app → script
+      </div>
+    </div>
+
+    <div>
+      <div class="toggle-row">
+        <span class="toggle-label">Send email report</span>
+        <label class="toggle">
+          <input type="checkbox" id="email-toggle" onchange="toggleEmail()">
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+      </div>
+
+      <div class="email-fields" id="email-fields">
+        <div class="field">
+          <input type="email" id="email-sender" placeholder="your Gmail">
+        </div>
+        <div class="field">
+          <input type="password" id="email-pass" placeholder="App Password">
+        </div>
+        <div class="field">
+          <input type="email" id="email-recv" placeholder="send report to">
+        </div>
+      </div>
+    </div>
+
+    <button class="btn-run" id="run-btn" onclick="runScan()">Run Scan</button>
+
+  </aside>
+
+  <!-- CONTENT -->
+  <main class="content" id="content">
+
+    <div class="empty-state" id="empty-state">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+      </svg>
+      <span>select subreddits and run scan</span>
+    </div>
+
+    <div class="scan-status" id="scan-status">
+      <div class="spinner" id="spinner"></div>
+      <span id="status-text">Scanning…</span>
+    </div>
+
+    <div class="results-header" id="results-header">
+      <div class="results-title">Top mentioned tickers</div>
+      <div class="results-meta" id="results-meta"></div>
+    </div>
+
+    <div class="ticker-grid" id="ticker-grid"></div>
+
+  </main>
+</div>
+
+<script>
+const SUBREDDITS = [
+  { name: "wallstreetbets", label: "r/wallstreetbets" },
+  { name: "stocks",         label: "r/stocks" },
+  { name: "investing",      label: "r/investing" },
+  { name: "options",        label: "r/options" },
+  { name: "stockmarket",    label: "r/stockmarket" },
+  { name: "Superstonk",     label: "r/Superstonk" },
+];
+
+let selected = new Set(["wallstreetbets", "stocks"]);
+
+// ── RENDER PILLS ──
+function renderPills() {
+  const container = document.getElementById("subreddit-pills");
+  container.innerHTML = "";
+  SUBREDDITS.forEach(s => {
+    const pill = document.createElement("div");
+    pill.className = "pill" + (selected.has(s.name) ? " selected" : "");
+    pill.textContent = s.label;
+    pill.onclick = () => {
+      if (selected.has(s.name)) {
+        if (selected.size > 1) selected.delete(s.name);
+      } else {
+        selected.add(s.name);
+      }
+      renderPills();
+    };
+    container.appendChild(pill);
+  });
+}
+
+renderPills();
+
+// ── TOGGLE EMAIL ──
+function toggleEmail() {
+  const open = document.getElementById("email-toggle").checked;
+  document.getElementById("email-fields").classList.toggle("open", open);
+}
+
+// ── SCAN ──
+async function runScan() {
+  const id     = document.getElementById("reddit-id").value.trim();
+  const secret = document.getElementById("reddit-secret").value.trim();
+
+  if (!id || !secret) return showError("Enter your Reddit API credentials.");
+
+  const sendMail  = document.getElementById("email-toggle").checked;
+  const emailData = sendMail ? {
+    send_email:     true,
+    email_sender:   document.getElementById("email-sender").value.trim(),
+    email_password: document.getElementById("email-pass").value.trim(),
+    email_receiver: document.getElementById("email-recv").value.trim(),
+  } : { send_email: false };
+
+  setLoading(true, `Scanning ${selected.size} subreddit${selected.size > 1 ? "s" : ""}…`);
+  document.getElementById("empty-state").style.display = "none";
+  document.getElementById("results-header").classList.remove("visible");
+  document.getElementById("ticker-grid").innerHTML = "";
+
+  try {
+    const res = await fetch("/api/scan", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        reddit_id:     id,
+        reddit_secret: secret,
+        subreddits:    [...selected],
+        ...emailData,
+      }),
+    });
+
+    const data = await res.json();
+    if (data.error) return showError(data.error);
+    renderResults(data.results, data.scanned);
+
+  } catch (e) {
+    showError("Failed to connect. Is the server running?");
+  } finally {
+    document.getElementById("run-btn").disabled = false;
+  }
+}
+
+// ── RENDER RESULTS ──
+function renderResults(results, scanned) {
+  document.getElementById("scan-status").className = "scan-status";
+
+  const header = document.getElementById("results-header");
+  header.classList.add("visible");
+
+  const subs = scanned.map(s => `r/${s}`).join(", ");
+  const now  = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  document.getElementById("results-meta").textContent = `${subs} · ${now}`;
+
+  const grid = document.getElementById("ticker-grid");
+  grid.innerHTML = "";
+
+  if (!results.length) {
+    grid.innerHTML = '<div style="color:var(--muted2);font-size:0.78rem;font-family:monospace">No tickers found.</div>';
+    return;
+  }
+
+  const maxMentions = results[0].mentions;
+
+  results.forEach((r, i) => {
+    const card = document.createElement("div");
+    card.className = "ticker-card";
+    card.style.animationDelay = `${i * 40}ms`;
+
+    const pct    = Math.round((r.mentions / maxMentions) * 100);
+    const price  = r.price != null ? `$${r.price}` : "—";
+    const chg    = r.change != null ? r.change : null;
+    const chgStr = chg != null ? `${chg >= 0 ? "+" : ""}${chg}%` : "";
+    const chgCls = chg != null ? (chg >= 0 ? "up" : "down") : "";
+
+    const postsHtml = (r.posts || []).map(p => `
+      <div class="post-item">
+        <span class="post-sub">r/${p.sub}</span>
+        <a href="${p.url}" target="_blank">${truncate(p.title, 60)}</a>
+      </div>`).join("");
+
+    card.innerHTML = `
+      <div class="card-top">
+        <div class="card-ticker">${r.ticker}</div>
+        <div class="card-mentions">${r.mentions} mention${r.mentions !== 1 ? "s" : ""}</div>
+      </div>
+      <div class="mention-bar-wrap">
+        <div class="mention-bar">
+          <div class="mention-bar-fill" style="width:${pct}%"></div>
+        </div>
+      </div>
+      <div class="card-price-row">
+        <div class="card-price">${price}</div>
+        ${chgStr ? `<div class="card-change ${chgCls}">${chgStr}</div>` : ""}
+      </div>
+      ${postsHtml ? `<div class="card-posts">${postsHtml}</div>` : ""}
+    `;
+
+    grid.appendChild(card);
+  });
+}
+
+function setLoading(on, msg) {
+  document.getElementById("run-btn").disabled = on;
+  const s = document.getElementById("scan-status");
+  if (on) {
+    s.className = "scan-status visible";
+    document.getElementById("spinner").style.display = "block";
+    document.getElementById("status-text").textContent = msg;
+  } else {
+    s.className = "scan-status";
+  }
+}
+
+function showError(msg) {
+  const s = document.getElementById("scan-status");
+  s.className = "scan-status visible error";
+  document.getElementById("spinner").style.display = "none";
+  document.getElementById("status-text").textContent = msg;
+  document.getElementById("run-btn").disabled = false;
+}
+
+function truncate(str, n) {
+  return str.length > n ? str.slice(0, n) + "…" : str;
+}
+</script>
+</body>
+</html>
